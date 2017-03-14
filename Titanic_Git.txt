@@ -1,0 +1,104 @@
+import numpy as np
+import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+import scipy.stats as stats
+matplotlib.style.use('ggplot')
+
+plt.figure(figsize=(8,8))
+
+#defining sigmoid function
+#def sigmoid(t):
+#    return(1/(1 + np.e**(-t)))
+
+#plot_range = np.arange(-6, 6, 0.1)
+#y_values = sigmoid(plot_range)
+
+#plotting the curve:x-axis range vs predicted values
+#plt.plot(plot_range, y_values, color="blue")
+#plt.show()
+
+#reading titanic survival data
+import os
+os.chdir('../input/')
+tit_train = pd.read_csv("train.csv")
+#reading cabin as string, saving as categorical variable
+char_cabin = tit_train["Cabin"].astype(str)
+new_cabin = np.array([cabin[0] for cabin in char_cabin])
+tit_train["Cabin"] = pd.Categorical(new_cabin)
+#assigning median Age for null NA values
+new_age_var = np.where(tit_train["Age"].isnull(), 28, tit_train["Age"])
+tit_train["Age"] = new_age_var
+
+#making logistic regression model using Sex as predictor variable
+from sklearn import linear_model
+from sklearn import preprocessing
+
+#initializing label encoder for converting Sex variable to numeric
+label_encoder = preprocessing.LabelEncoder()
+encoded_sex = label_encoder.fit_transform(tit_train["Sex"])
+#initializing and training regression model
+log_model = linear_model.LogisticRegression()
+log_model.fit(X = pd.DataFrame(encoded_sex), y = tit_train["Survived"])
+#checking trained model intercept and coefficients
+print(log_model.intercept_)
+print(log_model.coef_)
+
+#making predictions
+preds = log_model.predict_proba(X = pd.DataFrame(encoded_sex))
+preds = pd.DataFrame(preds)
+preds.columns = ["Death_prob","Survival_prob"]
+#generating table:predictions vs Sex
+pd.crosstab(tit_train["Sex"], preds.ix[:,"Survival_prob"])
+
+#including more variables
+encoded_cabin = label_encoder.fit_transform(tit_train["Cabin"])
+encoded_class = label_encoder.fit_transform(tit_train["Pclass"])
+train_features = pd.DataFrame([encoded_cabin, encoded_class, encoded_sex, tit_train["Age"]]).T
+
+#initializing, training and checking model
+log_model = linear_model.LogisticRegression()
+log_model.fit(X = train_features, y = tit_train["Survived"])
+print(log_model.intercept_)
+print(log_model.coef_)
+
+#making class predictions
+preds = log_model.predict(X = train_features)
+#generating table:predictions vs actual
+pd.crosstab(preds, tit_train["Survived"])
+
+#above confusion matrix shows 
+#(1,1)True positives:people the model predicted to survive who actually did survive. 
+#(0,1)False positives: people for whom the model predicted survival who did not actually survive. 
+#(0,0)True negatives: people correctly identified as non survivors.F
+#(1,0)False negatives: passengers the model identified as non survivors who actually did survive.
+
+#We can calculate the overall prediction accuracy from the matrix by adding the total number of correct predictions and dividing by the total number of predictions.
+(463+244)/889
+
+from sklearn import metrics
+#viewing confusion matrix
+metrics.confusion_matrix(y_true=tit_train["Survived"], y_pred=preds)
+
+#viewing summary of common classification metrics
+print(metrics.classification_report(y_true=tit_train["Survived"], y_pred=preds))
+
+#Reading and preparing titanic test data
+os.chdir('../input/')
+tit_test = pd.read_csv("test.csv")
+char_cabin = tit_test["Cabin"].astype(str)
+new_Cabin = np.array([cabin[0] for cabin in char_cabin])
+tit_test["Cabin"] = pd.Categorical(new_Cabin)
+#assigning median Age for NA values
+new_age_var = np.where(tit_test["Age"].isnull(), 28, tit_test["Age"])
+tit_test["Age"] = new_age_var
+
+#converting test variables to match model features
+encoded_sex = label_encoder.fit_transform(tit_test["Sex"])
+encoded_class = label_encoder.fit_transform(tit_test["Pclass"])
+encoded_cabin = label_encoder.fit_transform(tit_test["Cabin"])
+
+test_features = pd.DataFrame([encoded_class,encoded_cabin,encoded_sex,tit_test["Age"]]).T
+
+#making predictions on test set
+test_preds = log_model.predict(X=test_features)
